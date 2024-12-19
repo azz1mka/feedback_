@@ -16,7 +16,7 @@
 ### Установка
 1. Клонируйте репозиторий:
    ```bash
-   git clone [<URL>](https://github.com/azz1mka/feedback_.git)
+   git clone https://github.com/azz1mka/feedback_.git
    cd feedback_
    ```
 2. Установите зависимости:
