@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Общение с пользователями</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="app-container">
+      <h1 id="initial-title">Кому хотите написать?</h1>
+      <button id="user-toggle">Выбрать пользователя</button>
+      <div id="user-list"></div>
+      <div id="chat-container">
+        <h2 id="message-title">Напишите сообщение</h2>
+        <div id="chat-history"></div>
+        <textarea
+          id="message-input"
+          placeholder="Введите сообщение..."
+        ></textarea>
+        <button id="send-message">Отправить</button>
+      </div>
+    </div>
+
+    <script>
+      const userToggle = document.getElementById("user-toggle");
+      const userList = document.getElementById("user-list");
+      const messageInput = document.getElementById("message-input");
+      const sendMessageButton = document.getElementById("send-message");
+      const chatHistoryDiv = document.getElementById("chat-history");
+      const chatContainer = document.getElementById("chat-container");
+      const initialTitle = document.getElementById("initial-title");
+
+      let selectedUser = null;
+      let socket = null;
+
+      chatContainer.style.display = "none";
+
+      // Загрузка списка пользователей
+      userToggle.addEventListener("click", async () => {
+        if (userList.style.display === "none") {
+          const response = await fetch("/api/users");
+          const users = await response.json();
+          userList.innerHTML = "";
+
+          users.forEach((user) => {
+            const userItem = document.createElement("button");
+            userItem.className = "user-item";
+            userItem.innerText = user;
+            userItem.addEventListener("click", () => selectUser(user));
+            userList.appendChild(userItem);
+          });
+
+          userList.style.display = "block";
+          userList.classList.add("fade-in");
+        } else {
+          userList.style.display = "none";
+        }
+      });
+
+      // Выбор пользователя
+      async function selectUser(user) {
+        selectedUser = user;
+        userList.style.display = "none";
+        chatContainer.style.display = "block";
+        initialTitle.style.display = "none";
+
+        const response = await fetch(`/api/messages/${user}`);
+        const messages = await response.json();
+        chatHistoryDiv.innerHTML = messages
+          .map(
+            (msg) =>
+              `<p>[${formatTimestamp(msg.timestamp)}] <strong>${msg.sender}</strong>: ${msg.message}</p>`
+          )
+          .join("");
+
+        chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
+
+        // Инициализация WebSocket
+        if (!socket) {
+          socket = new WebSocket(`ws://${window.location.host}`);
+          socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            // Проверяем, что сообщение от выбранного пользователя
+            if (data.username === selectedUser) {
+              chatHistoryDiv.innerHTML += `<p>[${formatTimestamp(data.timestamp)}] <strong>${data.sender}</strong>: ${data.message}</p>`;
+              chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
+            }
+          };
+        }
+      }
+
+      // Отправка сообщения
+      sendMessageButton.addEventListener("click", async () => {
+        const message = messageInput.value;
+        if (!selectedUser || !message) {
+          alert("Выберите пользователя и введите сообщение.");
+          return;
+        }
+
+        // Отправляем сообщение через API
+        await fetch("/api/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: selectedUser, message }),
+        });
+
+        // Отправляем сообщение через WebSocket для отображения в реальном времени
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(
+            JSON.stringify({
+              username: selectedUser,
+              message: message,
+              timestamp: new Date().toISOString(),
+              sender: "admin",
+            })
+          );
+        }
+
+        messageInput.value = "";
+      });
+
+      // Функция для форматирования времени
+      function formatTimestamp(timestamp) {
+        const date = new Date(timestamp);
+        return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+      }
+    </script>
+  </body>
+</html>

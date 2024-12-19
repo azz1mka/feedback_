@@ -1,0 +1,16 @@
+version: "3.8"
+services:
+  server:
+    build:
+      context: . # Используем текущую директорию для сборки
+    container_name: telegram_bot_server
+    ports:
+      - "3000:3000" # Пробрасываем порт 3000
+    volumes:
+      - ./chat.db:/app/chat.db # Подключаем базу данных как том
+    environment:
+      - PORT=3000
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+    restart: unless-stopped
+    mem_limit: 512m # Ограничение по памяти
+    cpus: 0.5 # Ограничение по CPU
